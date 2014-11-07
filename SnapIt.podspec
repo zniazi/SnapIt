@@ -29,7 +29,8 @@ Pod::Spec.new do |s|
     'SnapIt' => ['Pod/Assets/*.png']
   }
 
-  s.frameworks = 'libsqlite3'
+  s.ios.frameworks = 'libsqlite3'
+  # s.frameworks = 'libsqlite3'
   s.dependency 'Swizzlean'
 
   # s.public_header_files = 'Pod/Classes/**/*.h'
