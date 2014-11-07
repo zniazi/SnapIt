@@ -24,12 +24,12 @@ Pod::Spec.new do |s|
   s.platform     = :ios, '7.0'
   s.requires_arc = true
 
-  s.source_files = 'Pod/Classes'
+s.source_files = 'Pod/Classes/*.{h,m}'
   s.resource_bundles = {
     'SnapIt' => ['Pod/Assets/*.png']
   }
 
-  s.frameworks = 'libsqlite3.dylib'
+  s.frameworks = 'libsqlite3'
   s.dependency 'Swizzlean'
 
   # s.public_header_files = 'Pod/Classes/**/*.h'

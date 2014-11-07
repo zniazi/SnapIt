@@ -495,6 +495,15 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		191EB86C1A0C789400F2B906 /* Classes */ = {
+			isa = PBXGroup;
+			children = (
+				191EB8691A0C6FE100F2B906 /* SnapIt.h */,
+				191EB86A1A0C6FE100F2B906 /* SnapIt.m */,
+			);
+			name = Classes;
+			sourceTree = "<group>";
+		};
 		2025CA20E8ABFF4D5ED1999A = {
 			isa = PBXGroup;
 			children = (
@@ -578,8 +587,7 @@
 		55BF4FF208EF427EDA128687 /* SnapIt */ = {
 			isa = PBXGroup;
 			children = (
-				191EB8691A0C6FE100F2B906 /* SnapIt.h */,
-				191EB86A1A0C6FE100F2B906 /* SnapIt.m */,
+				191EB86C1A0C789400F2B906 /* Classes */,
 				0491709B7A2609433E63A342 /* Support Files */,
 			);
 			name = SnapIt;
