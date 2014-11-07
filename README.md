@@ -11,6 +11,15 @@ To run the example project, clone the repo, and run `pod install` from the Examp
 
 `SnapIt` encapsulates the common patterns of persisting data to permanent storage via a SQLite Connection. 
 
+#### Persisting a SnapIt Resource.
+
+```objective-c
+#import "SnapIt.h"
+@interface Cat : SnapIt
+```
+
+To persist data, inherit from the SnapIt class.
+
 #### `SAVE` method
 
 ```objective-c
@@ -19,6 +28,8 @@ mits.name = @"Mits";
 mits.color = @"orange";
 [mits save];
 ```
+
+To add an object to the database, modify it's attributes and run the save method.
 
 ## Requirements
 
