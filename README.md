@@ -11,9 +11,9 @@ To run the example project, clone the repo, and run `pod install` from the Examp
 
 You must add "libsqlite3.dylib" to your "Linked Frameworks and Libraries" section of your application.
 
-`SnapIt` encapsulates the common patterns of persisting data to permanent storage via a SQLite Connection. 
-
 #### Persisting a SnapIt Resource.
+
+`SnapIt` encapsulates the common patterns of persisting data to permanent storage via a SQLite Connection. 
 
 ```objective-c
 #import "SnapIt.h"
