@@ -1,0 +1,12 @@
+source 'https://github.com/CocoaPods/Specs.git'
+
+target 'SnapIt', :exclusive => true do
+  pod "SnapIt", :path => "../"
+end
+
+target 'Tests', :exclusive => true do
+  pod "SnapIt", :path => "../"
+
+  pod 'Specta', '~> 0.2.1'
+  pod 'Expecta'
+end
