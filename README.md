@@ -18,9 +18,10 @@ it, simply add the following line to your Podfile:
 
     pod "SnapIt"
 
-## Author
+## Authors
 
 Zak Niazi, zniazi1029@gmail.com
+
 Daniel Wu, dan.wu.87@gmail.com
 
 ## License
