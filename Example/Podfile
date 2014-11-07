@@ -2,6 +2,7 @@ source 'https://github.com/CocoaPods/Specs.git'
 
 target 'SnapIt', :exclusive => true do
   pod "SnapIt", :path => "../"
+	pod "Swizzlean"
 end
 
 target 'Tests', :exclusive => true do
@@ -9,4 +10,5 @@ target 'Tests', :exclusive => true do
 
   pod 'Specta', '~> 0.2.1'
   pod 'Expecta'
+	pod 'Swizzlean'
 end

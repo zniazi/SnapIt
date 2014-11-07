@@ -12,7 +12,45 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
-    // Override point for customization after application launch.
+# pragma mark - Code Snippet 1
+    //    Cat *mits = [[Cat alloc] init];
+    //    mits.name = @"Mits";
+    //    mits.color = @"orange";
+    //    [mits save];
+    
+# pragma mark - Code Snippet 2
+    //    Person *beth = [[Person alloc] init];
+    //    beth.name = @"Beth";
+    //    [beth save];
+    //
+    //    Cat *bubbles = [[Cat alloc] init];
+    //    bubbles.name = @"Bubbles";
+    //    bubbles.color = @"grey";
+    //    bubbles.person = beth;
+    //    [bubbles save];
+    
+# pragma mark - Code Snippet 3
+    //    Cat *lucy = [[Cat alloc] init];
+    //    lucy.name = @"Lucy";
+    //    lucy.color = @"indigo";
+    //    [lucy save];
+    //
+    //    NSArray *people = [Person where:@"name='Bet'"];
+    //    Person *beth = people[0];
+    //    NSArray *allCats = [Cat all];
+    //    beth.cats = allCats;
+    //    [beth save];
+    
+# pragma mark - Code Snippet 4
+    //    Person *beth = [Person where:@"name='Beth'"][0];
+    //    NSLog(@"%@", beth.cats);
+    
+    //    Cat *lucy = [Cat where:@"name='Lucy'"][0];
+    //    [lucy deleteSelf];
+    
+    //    [beth fetch];
+    //    NSLog(@"%@", beth.cats);
+    
     return YES;
 }
 							

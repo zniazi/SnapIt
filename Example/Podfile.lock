@@ -1,0 +1,24 @@
+PODS:
+  - Expecta (0.3.1)
+  - SnapIt (0.1.0):
+    - Swizzlean
+  - Specta (0.2.1)
+  - Swizzlean (0.2.0)
+
+DEPENDENCIES:
+  - Expecta
+  - SnapIt (from `../`)
+  - Specta (~> 0.2.1)
+  - Swizzlean
+
+EXTERNAL SOURCES:
+  SnapIt:
+    :path: ../
+
+SPEC CHECKSUMS:
+  Expecta: 03aabd0a89d8dea843baecb19a7fd7466a69a31d
+  SnapIt: 86c515b31b35a265716a192e6d1625376bcba7fc
+  Specta: 9141310f46b1f68b676650ff2854e1ed0b74163a
+  Swizzlean: dc03ad1d847a3748f456982b7ede4e3bad4a9630
+
+COCOAPODS: 0.34.4
