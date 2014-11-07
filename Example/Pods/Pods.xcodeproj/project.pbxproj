@@ -221,8 +221,8 @@
 		121E2A3AF25B26A371171FC9 /* EXPMatchers+notify.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = "EXPMatchers+notify.m"; path = "src/matchers/EXPMatchers+notify.m"; sourceTree = "<group>"; };
 		15B5019B6BBBACE31FD49893 /* Pods-Tests-SnapIt-prefix.pch */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = "Pods-Tests-SnapIt-prefix.pch"; path = "../Pods-Tests-SnapIt/Pods-Tests-SnapIt-prefix.pch"; sourceTree = "<group>"; };
 		16E34EA5BCE46FD708751A60 /* EXPMatchers+beSupersetOf.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = "EXPMatchers+beSupersetOf.h"; path = "src/matchers/EXPMatchers+beSupersetOf.h"; sourceTree = "<group>"; };
-		191EB8631A0C6FAD00F2B906 /* NSString+Inflections.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSString+Inflections.h"; sourceTree = "<group>"; };
-		191EB8641A0C6FAD00F2B906 /* NSString+Inflections.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSString+Inflections.m"; sourceTree = "<group>"; };
+		191EB8631A0C6FAD00F2B906 /* NSString+Inflections.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "NSString+Inflections.h"; path = "Example/Pods/Target Support Files/Pods-SnapIt-SnapIt/NSString+Inflections.h"; sourceTree = "<group>"; };
+		191EB8641A0C6FAD00F2B906 /* NSString+Inflections.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "NSString+Inflections.m"; path = "Example/Pods/Target Support Files/Pods-SnapIt-SnapIt/NSString+Inflections.m"; sourceTree = "<group>"; };
 		191EB8691A0C6FE100F2B906 /* SnapIt.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SnapIt.h; path = Example/SnapIt/SnapIt.h; sourceTree = "<group>"; };
 		191EB86A1A0C6FE100F2B906 /* SnapIt.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = SnapIt.m; path = Example/SnapIt/SnapIt.m; sourceTree = "<group>"; };
 		1B13992C8A72A27A58226AA4 /* EXPMatchers+conformTo.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = "EXPMatchers+conformTo.m"; path = "src/matchers/EXPMatchers+conformTo.m"; sourceTree = "<group>"; };
@@ -454,8 +454,6 @@
 		0491709B7A2609433E63A342 /* Support Files */ = {
 			isa = PBXGroup;
 			children = (
-				191EB8631A0C6FAD00F2B906 /* NSString+Inflections.h */,
-				191EB8641A0C6FAD00F2B906 /* NSString+Inflections.m */,
 				76DB94925DADC5EE7933275A /* Pods-SnapIt-SnapIt.xcconfig */,
 				7624397C111A1F687452EE3A /* Pods-SnapIt-SnapIt-Private.xcconfig */,
 				0D00EDBB86A5FFDC014D34C1 /* Pods-SnapIt-SnapIt-dummy.m */,
@@ -500,6 +498,8 @@
 			children = (
 				191EB8691A0C6FE100F2B906 /* SnapIt.h */,
 				191EB86A1A0C6FE100F2B906 /* SnapIt.m */,
+				191EB8631A0C6FAD00F2B906 /* NSString+Inflections.h */,
+				191EB8641A0C6FAD00F2B906 /* NSString+Inflections.m */,
 			);
 			name = Classes;
 			sourceTree = "<group>";
