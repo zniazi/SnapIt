@@ -21,6 +21,7 @@ it, simply add the following line to your Podfile:
 ## Author
 
 Zak Niazi, zniazi1029@gmail.com
+Daniel Wu, dan.wu.87@gmail.com
 
 ## License
 
