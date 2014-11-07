@@ -7,7 +7,7 @@
 
 ## Usage
 
-To run the example project, clone the repo, and run `pod install` from the Example directory first.
+To run the example project, clone the repo, and run `pod install` from the Example directory first. You must add "libsqlite3.dylib" to your "Linked Frameworks and Libraries" section of your application.
 
 `SnapIt` encapsulates the common patterns of persisting data to permanent storage via a SQLite Connection. 
 
