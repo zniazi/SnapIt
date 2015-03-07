@@ -10,9 +10,9 @@
 #import <sqlite3.h>
 #import <objc/runtime.h>
 #import "NSString+Inflections.h"
-#import "Swizzlean.h"
+#import <AFNetworking/AFNetworking.h>
 
-static sqlite3 *_catsDB;
+static sqlite3 *_dbConnection;
 static NSString *_databasePath;
 static NSDictionary *_propertiesListAndTypes;
 static NSString *_lastSwizzledGetter;
@@ -23,17 +23,28 @@ static NSString *_lastSwizzledGetter;
 
 @implementation SnapIt
 
-- (instancetype)init
-{
-    self = [super init];
-    if (self) {
-        [self createHasManyAssociations];
-    }
+// TODO: Incomplete (Method intended to convert JSON structure to object)
+- (instancetype)initWithDictionary:(NSDictionary *)dictionary {
+    self = [SnapIt init];
+    
     return self;
 }
 
-+(void)initialize {
+- (instancetype)init
+{
+    self = [super init];
+
+    return self;
+}
+
++ (void)initialize {
     [self setupDB];
+    [self createHasManyAssociations];
+}
+
++ (NSString*)baseURL {
+    // Overwrite in subclass
+    return @"";
 }
 
 + (NSString *)databasePath {
@@ -41,7 +52,7 @@ static NSString *_lastSwizzledGetter;
 }
 
 + (sqlite3 **)catsDB {
-    return &_catsDB;
+    return &_dbConnection;
 }
 
 + (NSString *)getClassName
@@ -71,6 +82,20 @@ static NSString *_lastSwizzledGetter;
     
     free(properties);
     
+    // New Code
+    objc_property_t *snapItProperties = class_copyPropertyList([SnapIt class], &count);
+    unsigned j;
+    for (j = 0; j < count; j++) {
+        objc_property_t property = snapItProperties[j];
+        NSString *name = [NSString stringWithUTF8String:property_getName(property)];
+        if (![name isEqualToString:@"rowID"]) {
+            [propertyList addObject:name];
+        }
+    }
+    
+    free(snapItProperties);
+    // End New Code
+    
     return propertyList;
 }
 
@@ -91,7 +116,23 @@ static NSString *_lastSwizzledGetter;
         NSString *propertyTypeAfterParse = [self parseString:cPropertyType];
         
         //only objective C objects are stored into dictionary
-        if ([self isObject:cPropertyType]) {
+        //        if ([self isObject:cPropertyType]) {
+        [temporaryDictionary setObject:propertyTypeAfterParse forKey:propertyName];
+        //        }
+    }
+    
+    // Duplicate Code
+    // New Code
+    free(properties);
+    objc_property_t *snapItProperties = class_copyPropertyList([SnapIt class], &propertyCount);
+    for (int i = 0; i < propertyCount; i++) {
+        objc_property_t currentProperty = snapItProperties[i];
+        NSString *propertyName = [NSString stringWithUTF8String:property_getName(currentProperty)];
+        
+        const char *cPropertyType = property_getAttributes(currentProperty);
+        NSString *propertyTypeAfterParse = [self parseString:cPropertyType];
+        
+        if ([self isObject:cPropertyType] && ![propertyName isEqualToString:@"rowID"]) {
             [temporaryDictionary setObject:propertyTypeAfterParse forKey:propertyName];
         }
     }
@@ -103,7 +144,7 @@ static NSString *_lastSwizzledGetter;
             correctDictionary[key] = @"TEXT";
         } else if ([temporaryDictionary[key] isEqualToString:@"NSNumber"]) {
             correctDictionary[key] = @"REAL";
-        } else if ([temporaryDictionary[key] isEqualToString:@"Bool"]) {
+        } else if ([temporaryDictionary[key] isEqualToString:@"BOOL"]) {
             correctDictionary[key] = @"INTEGER";
         } else {
             correctDictionary[key] = temporaryDictionary[key];
@@ -120,8 +161,11 @@ static NSString *_lastSwizzledGetter;
 
 + (NSString *)parseString:(const char *)stringToParse
 {
+    // @"TB" is BOOL
     NSMutableString *result = [[NSMutableString alloc] init];
-    
+    if (stringToParse[1] == 'B') {
+        return @"BOOL";
+    }
     if ([self isObject:stringToParse]) {
         
         for (int i = 3; stringToParse[i] != '\"'; i++) {
@@ -141,14 +185,270 @@ static NSString *_lastSwizzledGetter;
     return NO;
 }
 
-- (void)createHasManyAssociations
++ (NSArray *)columnNames {
+    NSMutableArray *columnNames = [NSMutableArray new];
+    const char *dbpath = [_databasePath UTF8String];
+    sqlite3_stmt *statement;
+    if (sqlite3_open(dbpath, &_dbConnection) == SQLITE_OK) {
+        NSString *sql = [NSString stringWithFormat:@"SELECT * FROM %@", [self getTableName]];
+        const char *query_statement = [sql UTF8String];
+        if (sqlite3_prepare_v2(_dbConnection, query_statement, -1, &statement, NULL) == SQLITE_OK) {
+            for (NSInteger i=0; i < sqlite3_column_count(statement); i++) {
+                NSString *columnName = [[NSString alloc] initWithUTF8String:sqlite3_column_name(statement, (int)i)];
+                [columnNames addObject:columnName];
+            }
+        }
+        sqlite3_close(_dbConnection);
+    }
+    return columnNames;
+}
+
++ (void)updateTable {
+    NSArray *columnNames = [self columnNames];
+    NSArray *properties = [self allPropertyNames];
+    
+    for (NSString *property in properties) {
+        NSString *newColumn = [property underscore];
+        NSPredicate *containsColumn = [NSPredicate predicateWithFormat:@"%@ IN SELF", newColumn];
+        NSArray *filteredArray = [columnNames filteredArrayUsingPredicate:containsColumn];
+        
+        if (filteredArray.count == 0) {
+            // TODO: Do not add column if it is an unsupported data type (NSData, NSInteger, etc)
+            NSString *propertyType = _propertiesListAndTypes[property];
+            if (!([propertyType isEqualToString:@"NSArray"] || [propertyType isEqualToString:@"NSMutableArray"])) {
+                if (!([propertyType isEqualToString:@"TEXT"] || [propertyType isEqualToString:@"INTEGER"] || [propertyType isEqualToString:@"REAL"])) {
+                    NSString *foreignKey = [NSString stringWithFormat:@"%@_id", [propertyType underscore]];
+                    NSString *insertColumnSQL = [NSString stringWithFormat:@"ALTER TABLE %@ ADD COLUMN %@ %@", [self getTableName], foreignKey, @"INTEGER"];
+                    [self performSQL:insertColumnSQL];
+                    NSLog(@"%@", insertColumnSQL);
+                } else {
+                    NSString *insertColumnSQL = [NSString stringWithFormat:@"ALTER TABLE %@ ADD COLUMN %@ %@", [self getTableName],newColumn, propertyType];
+                    [self performSQL:insertColumnSQL];
+                    NSLog(@"%@", insertColumnSQL);
+                }
+            }
+        }
+    }
+    // SQLite does not support deleting columns
+}
+
++ (void)setupDB {
+    if (self == [SnapIt class]) {
+        NSArray *directoryPaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSMutableString *documentDirectory = directoryPaths[0];
+        NSString *fileName = [NSString stringWithFormat:@"/%@.db", [self getTableName]];
+        _databasePath = [[NSString alloc] initWithString: [documentDirectory stringByAppendingString:fileName]];
+    }
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    if (!(self.class == [SnapIt class])) {
+        [self getAllPropertiesAndTypes];
+        const char *dbpath = [_databasePath UTF8String];
+        char *errMessage;
+        
+        if (sqlite3_open(dbpath, &_dbConnection) == SQLITE_OK) {
+            NSMutableString *sql_create_string =
+            [NSMutableString stringWithFormat:@"CREATE TABLE IF NOT EXISTS %@(id INTEGER PRIMARY KEY AUTOINCREMENT", [self getTableName]];
+            NSArray *properties = [self allPropertyNames];
+            
+            for (NSInteger i=0; i < [properties count]; i++) {
+                NSString *propertyType = _propertiesListAndTypes[properties[i]];
+                // If property type is not NSArray, but is 'Cat' or 'Human', create a foreign key for belongs to.
+                // TODO: Create 4th nested if statement, checking if propertyType is a forbidden type like NSData, NSInteger, etc.
+                // TODO: If it is, create error message saying the data type is unsupported.
+                if (!([propertyType isEqualToString:@"NSArray"] || [propertyType isEqualToString:@"NSMutableArray"])) {
+                    if (!([propertyType isEqualToString:@"TEXT"] || [propertyType isEqualToString:@"INTEGER"] || [propertyType isEqualToString:@"REAL"])) {
+                        NSString *foreignKey = [NSString stringWithFormat:@"%@_id", [propertyType underscore]];
+                        [sql_create_string appendString:[NSString stringWithFormat:@", %@ %@", foreignKey, @"INTEGER"]];
+                    } else {
+                        [sql_create_string appendString:[NSString stringWithFormat:@", %@ %@", [properties[i] underscore], propertyType]];
+                    }
+                }
+            }
+            
+            [sql_create_string appendString:@")"];
+            
+            const char *sql_create_statement = [sql_create_string UTF8String];
+            if (sqlite3_exec(_dbConnection, sql_create_statement, NULL, NULL, &errMessage) != SQLITE_OK)
+            {
+                NSLog(@"Failed to create table.");
+            }
+            sqlite3_close(_dbConnection);
+            
+        } else {
+            NSLog(@"Failed to open / create Database.");
+        }
+    }
+}
+
++ (void)performSQL:(NSString *)sql {
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    const char *dbpath = [_databasePath UTF8String];
+    char *errMessage;
+    
+    if (sqlite3_open(dbpath, &_dbConnection) == SQLITE_OK) {
+        const char *sql_statement = [sql UTF8String];
+        if (sqlite3_exec(_dbConnection, sql_statement, NULL, NULL, &errMessage) != SQLITE_OK)
+        {
+            NSLog(@"Error executing SQL.");
+        }
+        sqlite3_close(_dbConnection);
+        
+    } else {
+        NSLog(@"Failed to open database connection.");
+    }
+}
+
++ (NSArray *)performFetchWithSQL:(NSString *)sql {
+    NSMutableArray *objects = [[NSMutableArray alloc] init];
+    const char *dbpath = [_databasePath UTF8String];
+    sqlite3_stmt *statement;
+    if (sqlite3_open(dbpath, &_dbConnection) == SQLITE_OK) {
+        NSString *querySQL = sql;
+        const char *query_statement = [querySQL UTF8String];
+        if (sqlite3_prepare_v2(_dbConnection, query_statement, -1, &statement, NULL) == SQLITE_OK) {
+            while (sqlite3_step(statement) == SQLITE_ROW) {
+                SnapIt *object = [[self alloc] init];
+                NSDictionary *propertyDictionary = [object.class propertyDictionary];
+                for (NSInteger i=0; i < sqlite3_column_count(statement); i++) {
+                    NSString *columnName = [[NSString alloc] initWithUTF8String:sqlite3_column_name(statement, (int)i)];
+                    if ([columnName isEqualToString:@"id"]) {
+                        columnName = [@"rowID" classify];
+                    } else {
+                        columnName = [columnName classify];
+                    }
+                    // if class name superclass is SnapIt
+                    NSString *className = [[columnName substringToIndex:columnName.length - 2] classify];
+                    id snapItObject = [[NSClassFromString(className) alloc] init];
+                    // Have to make sure object is not nil before invoking method on it.
+                    if ([[columnName substringFromIndex:columnName.length - 2] isEqualToString:@"Id"] && snapItObject != nil && [snapItObject isKindOfClass:[SnapIt class]]) {
+                        if (sqlite3_column_text(statement, (int)i)) {
+                            NSString *dataString = [[NSString alloc] initWithUTF8String:(const char *)sqlite3_column_text(statement, (int)i)];
+                            NSString *objectToFind = [[columnName underscore] substringToIndex:columnName.length - 2];
+                            id data = [self findObject:objectToFind withID:[dataString integerValue]];
+                            columnName = [columnName substringToIndex:columnName.length - 2];
+                            NSString *setter = [NSString stringWithFormat:@"set%@:", columnName];
+                            SEL s = NSSelectorFromString(setter);
+                            [object performSelector:s withObject:data];
+                        }
+                    } else {
+                        NSString *dataString = nil;
+                        if (sqlite3_column_text(statement, (int)i) != nil) {
+                            dataString = [[NSString alloc] initWithUTF8String:(const char *)sqlite3_column_text(statement, (int)i)];
+                        }
+                        
+                        NSString *setter = [NSString stringWithFormat:@"set%@:", columnName];
+                        SEL s = NSSelectorFromString(setter);
+                        
+                        
+                        NSString *propertyName = [columnName lowCamelCase];
+                        
+                        if (dataString != nil) {
+                            if ([propertyDictionary[propertyName] isEqualToString:@"TEXT"]) {
+                                NSString *data = dataString;
+                                [object performSelector:s withObject:data];
+                            } else if ([propertyDictionary[propertyName] isEqualToString:@"REAL"]) {
+                                NSNumber *data = @([dataString floatValue]);
+                                [object performSelector:s withObject:data];
+                            } else if ([propertyDictionary[propertyName] isEqualToString:@"INTEGER"]) {
+                                NSNumber *data = @([dataString integerValue]);
+                                [object performSelector:s withObject:data];
+                            } else {
+                                if ([setter isEqualToString:@"setRowID:"]) {
+                                    NSNumber *data = @([dataString integerValue]);
+                                    [object performSelector:s withObject:data];
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                [objects addObject:object];
+            }
+            sqlite3_finalize(statement);
+        }
+        
+        sqlite3_close(_dbConnection);
+    }
+    
+    return objects;
+    
+}
+
++ (NSArray *)where:(NSString *)whereClause {
+    NSString *sql = [NSString stringWithFormat:
+                     @"SELECT\
+                     *\
+                     FROM\
+                     %@\
+                     WHERE %@", [self getTableName], whereClause];
+    return [self performFetchWithSQL:sql];
+}
+
++ (NSArray *)all {
+    NSString *sql = [NSString stringWithFormat:
+                     @"SELECT\
+                     *\
+                     FROM\
+                     %@", [self getTableName]];
+    return [self performFetchWithSQL:sql];
+}
+
++ (NSArray *)findObjectsWithType:(NSString *)type andID:(NSInteger)objectID {
+    NSString *className = [[type substringToIndex:type.length - 1] classify];
+    Class class = NSClassFromString(className);
+    NSString *foreignKey = [NSStringFromClass([self class]) underscore];
+    foreignKey = [foreignKey stringByAppendingString:@"_id"];
+    NSArray *objects = [class where:[NSString stringWithFormat:@"%@=%i", foreignKey, objectID]];
+    return objects;
+}
+
++ (id)find:(NSInteger *)objectID {
+    NSArray *data = [self where:[NSString stringWithFormat:@"id=%i", objectID]];
+    if ([data count] > 0) {
+        return data[0];
+    }
+    return nil;
+}
+
++ (id)findObject:(NSString *)object withID:(NSInteger)objectID {
+    Class class = NSClassFromString([object classify]);
+    NSArray *data = [class where:[NSString stringWithFormat:@"id=%i", objectID]];
+    if ([data count] > 0) {
+        return data[0];
+    }
+    return nil;
+}
+
++ (void)deleteAll {
+    NSArray *allObjects = [self all];
+    for (SnapIt *obj in allObjects) {
+        [obj deleteSelf];
+    }
+}
+
+- (NSArray *)replaceGetter:(NSString *)propertyName {
+    NSString *ivarString = [NSString stringWithFormat:@"_%@", propertyName];
+    
+    Ivar objectIvar = class_getInstanceVariable(self.class, [ivarString UTF8String]);
+    NSArray *objects = object_getIvar(self, objectIvar);
+    if ([objects count] > 0) {
+        return objects;
+    } else {
+        if (_rowID) {
+            objects = [self.class findObjectsWithType:propertyName andID:[_rowID integerValue]];
+        }
+        return objects;
+    }
+}
+
++ (void)createHasManyAssociations
 {
-    NSArray *propertyNames = [self.class allPropertyNames];
+    NSArray *propertyNames = [self allPropertyNames];
     NSInteger propertyCount = [propertyNames count];
     
     unsigned int methodCount;
     
-    Method *myMethods = class_copyMethodList(self.class, &methodCount);
+    Method *myMethods = class_copyMethodList(self, &methodCount);
     
     NSMutableArray *methodNames = [[NSMutableArray alloc] init];
     
@@ -168,84 +468,18 @@ static NSString *_lastSwizzledGetter;
                 NSLog(@"Found a match of property: %@ and methodName: %@", propertyNames[i], methodNames[j]);
                 
                 SEL getterSEL = NSSelectorFromString(propertyNames[i]);
-                Swizzlean *swizzleThis = [[Swizzlean alloc] initWithClassToSwizzle:self.class];
-                swizzleThis.resetWhenDeallocated = NO;
-                [swizzleThis swizzleInstanceMethod:getterSEL withReplacementImplementation:^(id _self){
-                    
-                    NSString *ivarString = [NSString stringWithFormat:@"_%@", propertyNames[i]];
-                    
-                    Ivar objectIvar = class_getInstanceVariable(self.class, [ivarString UTF8String]);
-                    NSArray *objects = object_getIvar(self, objectIvar);
-                    if ([objects count] > 0) {
-                        return objects;
-                    } else {
-                        if (_rowID) {
-                            objects = [self.class findObjectsWithType:propertyNames[i] andID:[_rowID integerValue]];
-                        }
-                        return objects;
-                    }
-                }];
+                Method getterMethod = class_getInstanceMethod(self, getterSEL);
+                method_setImplementation(getterMethod, imp_implementationWithBlock(^NSArray *(id _self) {
+                    return [_self replaceGetter:propertyNames[i]];
+                }));
             }
         }
     }
     free(myMethods);
 }
 
-+ (void)setupDB {
-    if (self == [SnapIt class]) {
-        NSArray *directoryPaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-        NSMutableString *documentDirectory = directoryPaths[0];
-        NSString *fileName = [NSString stringWithFormat:@"/%@.db", [self getTableName]];
-        _databasePath = [[NSString alloc] initWithString: [documentDirectory stringByAppendingString:fileName]];
-    }
-    NSFileManager *fileManager = [NSFileManager defaultManager];
-    if (!(self.class == [SnapIt class])) {
-        [self getAllPropertiesAndTypes];
-        const char *dbpath = [_databasePath UTF8String];
-        char *errMessage;
-        
-        if (sqlite3_open(dbpath, &_catsDB) == SQLITE_OK) {
-            NSMutableString *sql_create_string =
-            [NSMutableString stringWithFormat:@"CREATE TABLE IF NOT EXISTS %@(id INTEGER PRIMARY KEY AUTOINCREMENT", [self getTableName]];
-            NSArray *properties = [self allPropertyNames];
-            
-            for (NSInteger i=0; i < [properties count]; i++) {
-                NSString *propertyType = _propertiesListAndTypes[properties[i]];
-                if (!([propertyType isEqualToString:@"NSArray"] || [propertyType isEqualToString:@"NSMutableArray"])) {
-                    if (i == [properties count] - 1) {
-                        if (!([propertyType isEqualToString:@"TEXT"] || [propertyType isEqualToString:@"INTEGER"] || [propertyType isEqualToString:@"REAL"])) {
-                            NSString *foreignKey = [NSString stringWithFormat:@"%@_id", [propertyType underscore]];
-                            [sql_create_string appendString:[NSString stringWithFormat:@", %@ %@", foreignKey, @"INTEGER"]];
-                        } else {
-                            [sql_create_string appendString:[NSString stringWithFormat:@", %@ %@", [properties[i] underscore], propertyType]];
-                        }
-                    } else {
-                        if (!([propertyType isEqualToString:@"TEXT"] || [propertyType isEqualToString:@"INTEGER"] || [propertyType isEqualToString:@"REAL"])) {
-                            NSString *foreignKey = [NSString stringWithFormat:@"%@_id", [propertyType underscore]];
-                            [sql_create_string appendString:[NSString stringWithFormat:@", %@ %@", foreignKey, @"INTEGER"]];
-                        } else {
-                            [sql_create_string appendString:[NSString stringWithFormat:@", %@ %@", [properties[i] underscore], propertyType]];
-                        }
-                    }
-                }
-            }
-            
-            [sql_create_string appendString:@")"];
-            
-            const char *sql_create_statement = [sql_create_string UTF8String];
-            if (sqlite3_exec(_catsDB, sql_create_statement, NULL, NULL, &errMessage) != SQLITE_OK)
-            {
-                NSLog(@"Failed to create table.");
-            }
-            sqlite3_close(_catsDB);
-            
-        } else {
-            NSLog(@"Failed to open / create Database.");
-        }
-    }
-}
-
 - (void)save {
+    [self.class updateTable];
     if (self.rowID) {
         [self update];
     } else {
@@ -257,55 +491,59 @@ static NSString *_lastSwizzledGetter;
     sqlite3_stmt *statement;
     const char *dbpath = [self.class.databasePath UTF8String];
     
-    if (sqlite3_open(dbpath, self.class.catsDB) == SQLITE_OK) {
+    if (sqlite3_open(dbpath, &_dbConnection) == SQLITE_OK) {
         NSMutableString *updateSQL = [NSMutableString stringWithFormat:@"UPDATE %@ ", [self.class getTableName]];
         NSDictionary *propertyDictionary = [self.class propertyDictionary];
         NSArray *properties = [self.class allPropertyNames];
         for (NSInteger i=0; i < [properties count]; i++) {
             NSString *propertyType = propertyDictionary[properties[i]];
             NSString *getter = [NSString stringWithFormat:@"%@", properties[i]];
-            SEL s = NSSelectorFromString(getter);
-            id value = [self performSelector:s];
-            if ([propertyType isEqualToString:@"TEXT"]) {
-                value = [self performSelector:s];
-                value = [NSString stringWithFormat:@"\"%@\"", value];
-            }
-            if (!([propertyType isEqualToString:@"TEXT"] || [propertyType isEqualToString:@"INTEGER"] || [propertyType isEqualToString:@"REAL"] || [propertyType isEqualToString:@"NSArray"] || [propertyType isEqualToString:@"NSMutableArray"])) {
-                NSString *foreignKey = [NSString stringWithFormat:@"%@_id", [propertyType underscore]];
-                value = ((SnapIt *)value).rowID;
-                if (i == 0) {
-                    [updateSQL appendString:[NSString stringWithFormat:@"SET %@=%@", foreignKey, value]];
-                } else {
-                    [updateSQL appendString:[NSString stringWithFormat:@", %@=%@", foreignKey, value]];
+            if (![propertyType isEqualToString:@"NSArray"] || [propertyType isEqualToString:@"NSMutableArray"]) {
+  
+                id value = [self valueForKey:getter];
+                if ([propertyType isEqualToString:@"TEXT"]) {
+                    value = (value == nil) ? @"NULL" : [NSString stringWithFormat:@"\"%@\"", value];
                 }
-            } else {
-                if (!([propertyType isEqualToString:@"NSArray"] || [propertyType isEqualToString:@"NSMutableArray"])) {
+                value = (value == nil) ? @"NULL" : value;
+                if (!([propertyType isEqualToString:@"TEXT"] || [propertyType isEqualToString:@"INTEGER"] || [propertyType isEqualToString:@"REAL"] || [propertyType isEqualToString:@"NSArray"] || [propertyType isEqualToString:@"NSMutableArray"])) {
+                    NSString *foreignKey = [NSString stringWithFormat:@"%@_id", [propertyType underscore]];
+                    // Value is belongs to association
+                    if ([value isKindOfClass:[SnapIt class]]) {
+                        value = ((SnapIt *)value).rowID;
+                    }
                     if (i == 0) {
-                        [updateSQL appendString:[NSString stringWithFormat:@"SET %@=%@", properties[i], value]];
+                        [updateSQL appendString:[NSString stringWithFormat:@"SET %@=%@", foreignKey, value]];
                     } else {
-                        [updateSQL appendString:[NSString stringWithFormat:@", %@=%@", properties[i], value]];
+                        [updateSQL appendString:[NSString stringWithFormat:@", %@=%@", foreignKey, value]];
+                    }
+                } else {
+                    if (!([propertyType isEqualToString:@"NSArray"] || [propertyType isEqualToString:@"NSMutableArray"])) {
+                        NSString *property = properties[i];
+                        if (i == 0) {
+                            [updateSQL appendString:[NSString stringWithFormat:@"SET %@=%@", [property underscore], value]];
+                        } else {
+                            // If value is 0 and is NSNumber, set to @"0"
+                            [updateSQL appendString:[NSString stringWithFormat:@", %@=%@", [property underscore], value]];
+                        }
                     }
                 }
             }
         }
         
-        [updateSQL appendString:[NSString stringWithFormat:@" WHERE id=%i", [self.rowID integerValue]]];
+        [updateSQL appendString:[NSString stringWithFormat:@" WHERE id=%i;", [self.rowID integerValue]]];
         
         const char *update_statement = [updateSQL UTF8String];
         
-        sqlite3 *catsDB = *self.class.catsDB;
-        
-        sqlite3_prepare_v2(catsDB, update_statement, -1, &statement, NULL);
+        sqlite3_prepare_v2(_dbConnection, update_statement, -1, &statement, NULL);
         if (sqlite3_step(statement) == SQLITE_DONE) {
             NSLog(@"Object updated");
         } else {
             NSLog(@"Failed to update object.");
-            NSLog(@"%s", sqlite3_errmsg(catsDB));
+            NSLog(@"%s", sqlite3_errmsg(_dbConnection));
         }
         sqlite3_finalize(statement);
         
-        sqlite3_close(catsDB);
-        catsDB = nil;
+        sqlite3_close(_dbConnection);
     }
     
     NSDictionary *propertyDictionary = [self.class propertyDictionary];
@@ -324,7 +562,7 @@ static NSString *_lastSwizzledGetter;
                 [obj performSelector:s withObject:nil];
                 [obj save];
             }
-
+            
             for (SnapIt *object in objects) {
                 NSString *className = NSStringFromClass(self.class);
                 NSString *classSetter = [NSString stringWithFormat:@"set%@:", [className classify]];
@@ -334,7 +572,7 @@ static NSString *_lastSwizzledGetter;
             }
         }
     }
-
+    
 }
 
 - (void)insert {
@@ -356,10 +594,11 @@ static NSString *_lastSwizzledGetter;
                 }
             } else {
                 if (!([propertyType isEqualToString:@"NSArray"] || [propertyType isEqualToString:@"NSMutableArray"])) {
+                    NSString *property = properties[i];
                     if (i == 0) {
-                        [insertSQL appendString:[NSString stringWithFormat:@" (%@", properties[i]]];
+                        [insertSQL appendString:[NSString stringWithFormat:@" (%@", [property underscore]]];
                     } else {
-                        [insertSQL appendString:[NSString stringWithFormat:@", %@", properties[i]]];
+                        [insertSQL appendString:[NSString stringWithFormat:@", %@", [property underscore]]];
                     }
                 }
             }
@@ -404,7 +643,7 @@ static NSString *_lastSwizzledGetter;
             NSLog(@"%s", sqlite3_errmsg(catsDB));
         }
         sqlite3_finalize(statement);
-
+        
         sqlite3_close(catsDB);
         catsDB = nil;
     }
@@ -499,114 +738,56 @@ static NSString *_lastSwizzledGetter;
     }
 }
 
-+ (NSArray *)performFetchWithSQL:(NSString *)sql {
-    NSMutableArray *objects = [[NSMutableArray alloc] init];
-    const char *dbpath = [_databasePath UTF8String];
-    sqlite3_stmt *statement;
-    if (sqlite3_open(dbpath, &_catsDB) == SQLITE_OK) {
-        NSString *querySQL = sql;
-        const char *query_statement = [querySQL UTF8String];
-        if (sqlite3_prepare_v2(_catsDB, query_statement, -1, &statement, NULL) == SQLITE_OK) {
-            while (sqlite3_step(statement) == SQLITE_ROW) {
-                SnapIt *object = [[self alloc] init];
-                NSDictionary *propertyDictionary = [object.class propertyDictionary];
-                for (NSInteger i=0; i < sqlite3_column_count(statement); i++) {
-                    NSString *columnName = [[NSString alloc] initWithUTF8String:sqlite3_column_name(statement, i)];
-                    if ([columnName isEqualToString:@"id"]) {
-                        columnName = [@"rowID" classify];
-                    } else {
-                        columnName = [columnName classify];
-                    }
-                    if ([[columnName substringFromIndex:columnName.length - 2] isEqualToString:@"Id"]) {
-                        if (sqlite3_column_text(statement, i)) {
-                            NSString *dataString = [[NSString alloc] initWithUTF8String:(const char *)sqlite3_column_text(statement, i)];
-                            NSString *objectToFind = [[columnName underscore] substringToIndex:columnName.length - 2];
-                            id data = [self findObject:objectToFind withID:[dataString integerValue]];
-                            columnName = [columnName substringToIndex:columnName.length - 2];
-                            NSString *setter = [NSString stringWithFormat:@"set%@:", columnName];
-                            SEL s = NSSelectorFromString(setter);
-                            [object performSelector:s withObject:data];
-                        }
-                    } else {
-                        NSString *dataString = [[NSString alloc] initWithUTF8String:(const char *)sqlite3_column_text(statement, i)];
-                        
-                        NSString *setter = [NSString stringWithFormat:@"set%@:", columnName];
-                        SEL s = NSSelectorFromString(setter);
-                        
-                        NSString *propertyName = [columnName lowCamelCase];
-                        if ([propertyDictionary[propertyName] isEqualToString:@"TEXT"]) {
-                            NSString *data = dataString;
-                            [object performSelector:s withObject:data];
-                        } else if ([propertyDictionary[propertyName] isEqualToString:@"REAL"]) {
-                            NSNumber *data = @([dataString floatValue]);
-                            [object performSelector:s withObject:data];
-                        } else if ([propertyDictionary[propertyName] isEqualToString:@"INTEGER"]) {
-                            NSNumber *data = @([dataString integerValue]);
-                            [object performSelector:s withObject:data];
-                        } else {
-                            if ([setter isEqualToString:@"setRowID:"]) {
-                                NSNumber *data = @([dataString integerValue]);
-                                [object performSelector:s withObject:data];
-                            }
-                        }
-                    }
-                }
-                
-                [objects addObject:object];
-            }
-            sqlite3_finalize(statement);
-        }
-        
-        sqlite3_close(_catsDB);
-    }
+// Networking
+- (void)pushBackendWithCompletionBlock:(void (^)(BOOL success))completionBlock {
+    AFHTTPRequestOperationManager *manager = [AFHTTPRequestOperationManager manager];
+    NSMutableSet *acceptableContentTypes = [NSMutableSet setWithSet:manager.responseSerializer.acceptableContentTypes];
+    [acceptableContentTypes addObject:@"text/plain"];
+    manager.responseSerializer.acceptableContentTypes = acceptableContentTypes;
+    NSDictionary *propertyDictionary = [self.class propertyDictionary];
     
-    return objects;
-
-}
-
-+ (NSArray *)where:(NSString *)whereClause {
-    NSString *sql = [NSString stringWithFormat:
-     @"SELECT\
-     *\
-     FROM\
-     %@\
-     WHERE %@", [self getTableName], whereClause];
-    return [self performFetchWithSQL:sql];
-}
-
-+ (NSArray *)all {
-    NSString *sql = [NSString stringWithFormat:
-     @"SELECT\
-     *\
-     FROM\
-     %@", [self getTableName]];
-    return [self performFetchWithSQL:sql];
-}
-
-+ (NSArray *)findObjectsWithType:(NSString *)type andID:(NSInteger)objectID {
-    NSString *className = [[type substringToIndex:type.length - 1] classify];
-    Class class = NSClassFromString(className);
-    NSString *foreignKey = [NSStringFromClass([self class]) underscore];
-    foreignKey = [foreignKey stringByAppendingString:@"_id"];
-    NSArray *objects = [class where:[NSString stringWithFormat:@"%@=%i", foreignKey, objectID]];
-    return objects;
-}
-
-+ (id)find:(NSInteger *)objectID {
-    NSArray *data = [self where:[NSString stringWithFormat:@"id=%i", objectID]];
-    if ([data count] > 0) {
-        return data[0];
+    NSMutableDictionary *params = [[NSMutableDictionary alloc] init];
+    // TODO: If NSNumber and null, send as @"0"
+    for (NSString *property in [self.class allPropertyNames]) {
+        NSString *ivarString = [NSString stringWithFormat:@"_%@", property];
+        Ivar objectIvar = class_getInstanceVariable(self.class, [ivarString UTF8String]);
+        id propertyValue = object_getIvar(self, objectIvar);
+        if ([propertyDictionary[property] isEqualToString:@"REAL"]) {
+            propertyValue = (propertyValue == nil) ? @(0) : propertyValue;
+            [params setObject:propertyValue forKey:[NSString stringWithFormat:@"%@[%@]",[self.class getClassName], [property underscore]]];
+        } else {
+            propertyValue = (propertyValue == nil) ? @"" : propertyValue;
+            [params setObject:propertyValue forKey:[NSString stringWithFormat:@"%@[%@]",[self.class getClassName], [property underscore]]];
+        }
     }
-    return nil;
+    NSLog(@"Backend Params: %@", params); // To be deleted
+    if (self.backendId == nil) {
+        [manager POST:[self.class baseURL] parameters:params success:^(AFHTTPRequestOperation *operation, id responseObject) {
+            if (responseObject[@"id"] != nil) {
+                NSLog(@"Updated object on server.");
+                self.backendId = @([responseObject[@"id"] integerValue]);
+                [self save];
+                completionBlock(YES);
+            }
+        } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+            NSLog(@"Failed to update object on server: %@", error.description);
+            completionBlock(NO);
+        }];
+    } else {
+        [manager PATCH:[NSString stringWithFormat:@"%@/%@", [self.class baseURL], self.backendId] parameters:params success:^(AFHTTPRequestOperation *operation, id responseObject) {
+            if (responseObject[@"id"] != nil) {
+                NSLog(@"Updated object on server.");
+                completionBlock(YES);
+            }
+        } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+            NSLog(@"Failed to update object on server.");
+            completionBlock(NO);
+        }];
+    }
 }
 
-+ (id)findObject:(NSString *)object withID:(NSInteger)objectID {
-    Class class = NSClassFromString([object classify]);
-    NSArray *data = [class where:[NSString stringWithFormat:@"id=%i", objectID]];
-    if ([data count] > 0) {
-        return data[0];
-    }
-    return nil;
+- (void)pullBackend{
+    
 }
+
 @end
-

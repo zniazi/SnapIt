@@ -9,8 +9,7 @@
 #import <Foundation/Foundation.h>
 
 @interface SnapIt : NSObject
-@property (strong, nonatomic) NSString *databasePath;
-@property (nonatomic, readonly) NSNumber *rowID;
+@property (strong, nonatomic) NSNumber *backendId;
 
 - (void)save;
 - (void)deleteSelf;
@@ -20,6 +19,11 @@
 + (NSArray *)all;
 + (NSArray *)performFetchWithSQL:(NSString *)sql;
 + (id)find:(NSInteger *)objectID;
++ (void)deleteAll;
++ (NSString *)baseURL; // Possible to be deleted.
 
+// Networking
+- (void)pushBackendWithCompletionBlock:(void (^)(BOOL success))completionBlock;
+- (void)pullBackend;
 @end
 
