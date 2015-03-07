@@ -29,7 +29,7 @@ Pod::Spec.new do |s|
     'SnapIt' => ['Pod/Assets/*.png']
   }
 
-  s.frameworks = 'libsqlite3'
+  # s.frameworks = 'libsqlite3'
   s.dependency 'AFNetworking'
 
   # s.public_header_files = 'Pod/Classes/**/*.h'
