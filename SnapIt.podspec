@@ -9,7 +9,7 @@
 
 Pod::Spec.new do |s|
   s.name             = "SnapIt"
-  s.version          = "0.1.2"
+  s.version          = "0.1.3"
   s.summary          = "A Core Data Lite alternative built using Ruby like syntax."
   s.description      = <<-DESC
                        * A Core Data Lite alternative for persistent storage of your objects. Use intuitive commands like "where" and "save" to fetch models or persist data. The syntax is based off of Active Record from Ruby on Rails.
