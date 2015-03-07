@@ -1,5 +1,5 @@
 #include "Pods-SnapIt-SnapIt.xcconfig"
 GCC_PREPROCESSOR_DEFINITIONS = $(inherited) COCOAPODS=1
 HEADER_SEARCH_PATHS = "${PODS_ROOT}/Headers/Build" "${PODS_ROOT}/Headers/Build/SnapIt" "${PODS_ROOT}/Headers/Public" "${PODS_ROOT}/Headers/Public/Expecta" "${PODS_ROOT}/Headers/Public/SnapIt" "${PODS_ROOT}/Headers/Public/Specta" "${PODS_ROOT}/Headers/Public/Swizzlean"
-OTHER_LDFLAGS = ${PODS_SNAPIT_SNAPIT_OTHER_LDFLAGS} -ObjC
+OTHER_LDFLAGS = -ObjC
 PODS_ROOT = ${SRCROOT}

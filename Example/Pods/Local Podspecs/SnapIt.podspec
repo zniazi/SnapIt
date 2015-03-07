@@ -9,7 +9,7 @@
 
 Pod::Spec.new do |s|
   s.name             = "SnapIt"
-  s.version          = "0.1.0"
+  s.version          = "0.1.2"
   s.summary          = "A Core Data Lite alternative built using Ruby like syntax."
   s.description      = <<-DESC
                        * A Core Data Lite alternative for persistent storage of your objects. Use intuitive commands like "where" and "save" to fetch models or persist data. The syntax is based off of Active Record from Ruby on Rails.
@@ -17,19 +17,19 @@ Pod::Spec.new do |s|
   s.homepage         = "https://github.com/zniazi/SnapIt"
   # s.screenshots     = "www.example.com/screenshots_1", "www.example.com/screenshots_2"
   s.license          = 'MIT'
-  s.author           = { "Zak Niazi" => "zniazi1029@gmail.com", "Danny Wu" => "dan.wu.87@gmail.com " }
+  s.author           = { "Zak Niazi" => "zniazi1029@gmail.com" }
   s.source           = { :git => "https://github.com/zniazi/SnapIt.git", :tag => s.version.to_s }
   # s.social_media_url = 'https://twitter.com/zakniazi2'
 
   s.platform     = :ios, '7.0'
   s.requires_arc = true
 
-  s.source_files = 'Pod/Classes'
+  s.source_files = 'Pod/Classes/*.{h,m}'
   s.resource_bundles = {
     'SnapIt' => ['Pod/Assets/*.png']
   }
 
-  s.frameworks = 'libsqlite3.dylib'
+  # s.framework = 'libsqlite3'
   s.dependency 'Swizzlean'
 
   # s.public_header_files = 'Pod/Classes/**/*.h'

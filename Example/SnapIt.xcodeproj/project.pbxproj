@@ -10,6 +10,7 @@
 		191EB85B1A0C6EEE00F2B906 /* Cat.m in Sources */ = {isa = PBXBuildFile; fileRef = 191EB8581A0C6EEE00F2B906 /* Cat.m */; };
 		191EB85C1A0C6EEE00F2B906 /* Person.m in Sources */ = {isa = PBXBuildFile; fileRef = 191EB85A1A0C6EEE00F2B906 /* Person.m */; };
 		191EB8681A0C6FD700F2B906 /* SnapIt.m in Sources */ = {isa = PBXBuildFile; fileRef = 191EB8671A0C6FD700F2B906 /* SnapIt.m */; };
+		19DAA9DD1A38EB4F00A80C1E /* libsqlite3.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 19DAA9DC1A38EB4F00A80C1E /* libsqlite3.dylib */; };
 		45271DDD77F812EABF209D93 /* libPods-Tests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 95C8D8DBD9C7AF0A7A004599 /* libPods-Tests.a */; };
 		6003F58E195388D20070C39A /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6003F58D195388D20070C39A /* Foundation.framework */; };
 		6003F590195388D20070C39A /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6003F58F195388D20070C39A /* CoreGraphics.framework */; };
@@ -44,6 +45,7 @@
 		191EB85A1A0C6EEE00F2B906 /* Person.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Person.m; sourceTree = "<group>"; };
 		191EB8661A0C6FD700F2B906 /* SnapIt.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SnapIt.h; sourceTree = "<group>"; };
 		191EB8671A0C6FD700F2B906 /* SnapIt.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SnapIt.m; sourceTree = "<group>"; };
+		19DAA9DC1A38EB4F00A80C1E /* libsqlite3.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libsqlite3.dylib; path = usr/lib/libsqlite3.dylib; sourceTree = SDKROOT; };
 		2A853CB3EB44E8A8D1D3DB36 /* README.md */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../README.md; sourceTree = "<group>"; };
 		41AA02FB1F629F4F8AB11EC0 /* libPods-SnapIt.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SnapIt.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4632BC52BA628853E917E757 /* Pods-Tests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Tests.debug.xcconfig"; path = "Pods/Target Support Files/Pods-Tests/Pods-Tests.debug.xcconfig"; sourceTree = "<group>"; };
@@ -76,6 +78,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				19DAA9DD1A38EB4F00A80C1E /* libsqlite3.dylib in Frameworks */,
 				6003F590195388D20070C39A /* CoreGraphics.framework in Frameworks */,
 				6003F592195388D20070C39A /* UIKit.framework in Frameworks */,
 				6003F58E195388D20070C39A /* Foundation.framework in Frameworks */,
@@ -134,6 +137,7 @@
 		6003F58C195388D20070C39A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				19DAA9DC1A38EB4F00A80C1E /* libsqlite3.dylib */,
 				6003F58D195388D20070C39A /* Foundation.framework */,
 				6003F58F195388D20070C39A /* CoreGraphics.framework */,
 				6003F591195388D20070C39A /* UIKit.framework */,

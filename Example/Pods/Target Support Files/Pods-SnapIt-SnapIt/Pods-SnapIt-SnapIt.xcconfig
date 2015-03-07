@@ -1,1 +1,0 @@
-PODS_SNAPIT_SNAPIT_OTHER_LDFLAGS = -framework "libsqlite3.dylib"
