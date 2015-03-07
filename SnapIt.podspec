@@ -30,6 +30,7 @@ Pod::Spec.new do |s|
   }
 
   s.frameworks = 'libsqlite3'
+  s.dependency 'AFNetworking'
 
   # s.public_header_files = 'Pod/Classes/**/*.h'
   # s.frameworks = 'UIKit', 'MapKit'
