@@ -998,8 +998,80 @@ static BOOL _isOpened;
     }
 }
 
-- (void)pullBackend{
+//- (void)pushBackend{
+//    AFHTTPRequestOperationManager *manager = [[AFHTTPRequestOperationManager alloc] init];
+//    NSMutableSet *acceptableContentTypes = [NSMutableSet setWithSet:manager.responseSerializer.acceptableContentTypes];
+//    [acceptableContentTypes addObject:@"text/plain"];
+//    manager.responseSerializer.acceptableContentTypes = acceptableContentTypes;
+//    NSDictionary *propertyDictionary = [self.class propertyDictionary];
+//    
+//    [manager POST:[self.class baseURL] parameters:nil constructingBodyWithBlock:^(id<AFMultipartFormData> formData) {
+//        // TODO: If NSNumber and null, send as @"0"
+//        for (NSString *property in [self.class allPropertyNames]) {
+//            NSString *ivarString = [NSString stringWithFormat:@"_%@", property];
+//            Ivar objectIvar = class_getInstanceVariable(self.class, [ivarString UTF8String]);
+//            id propertyValue = object_getIvar(self, objectIvar);
+//            if ([propertyDictionary[property] isEqualToString:@"REAL"]) {
+//                propertyValue = (propertyValue == nil) ? @(0) : propertyValue;
+//                [formData appendPartWithFormData:[audioChunk.audioFileName dataUsingEncoding:NSUTF8StringEncoding] name:[NSString stringWithFormat:@"%@[%@]",[self.class getClassName]];
+//                [params setObject:propertyValue forKey:, [property underscore]]];
+//            } else {
+//                propertyValue = (propertyValue == nil) ? @"" : propertyValue;
+//                [params setObject:propertyValue forKey:[NSString stringWithFormat:@"%@[%@]",[self.class getClassName], [property underscore]]];
+//            }
+//        }
+//        [formData appendPartWithFileData:subData
+//                                    name:@"audio_chunk[audio]"
+//                                fileName:audioChunk.audioFileName mimeType:@"audio/wav"];
+//        
+//        [formData appendPartWithFormData:[audioChunk.audioFileName dataUsingEncoding:NSUTF8StringEncoding] name:@"audio_chunk[audioFileName]"];
+//        [formData appendPartWithFormData:[audioChunk.iosCreatedAt dataUsingEncoding:NSUTF8StringEncoding] name:@"audio_chunk[ios_created_at"];
+//        [formData appendPartWithFormData:[[NSString stringWithFormat:@"%@", audioChunk.recording.backendId] dataUsingEncoding:NSUTF8StringEncoding] name:@"audio_chunk[recording_id]"];
+//    } success:^(AFHTTPRequestOperation *operation, id responseObject) {
+//        NSLog(@"Success: %@", responseObject);
+//    } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+//        NSLog(@"Error: %@", error);
+//    }];
+//    
+//    if (self.backendId == nil) {
+//        [manager POST:[self.class baseURL] parameters:params success:^(AFHTTPRequestOperation *operation, id responseObject) {
+//            if (responseObject[@"id"] != nil) {
+//                NSLog(@"Updated object on server.");
+//                self.backendId = @([responseObject[@"id"] integerValue]);
+//                [self save];
+//            }
+//        } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+//            NSLog(@"Failed to update object on server: %@", error.description);
+//        }];
+//    } else {
+//        [manager PATCH:[NSString stringWithFormat:@"%@/%@", [self.class baseURL], self.backendId] parameters:params success:^(AFHTTPRequestOperation *operation, id responseObject) {
+//            if (responseObject[@"id"] != nil) {
+//                NSLog(@"Updated object on server.");
+//            }
+//        } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+//            NSLog(@"Failed to update object on server.");
+//        }];
+//    }
+//}
+
+- (void)pullBackendWithCompletionBlock:(void (^)(NSDictionary *response))completionBlock {
+    AFHTTPRequestOperationManager *manager = [AFHTTPRequestOperationManager manager];
+    NSMutableSet *acceptableContentTypes = [NSMutableSet setWithSet:manager.responseSerializer.acceptableContentTypes];
+    [acceptableContentTypes addObject:@"text/plain"];
+    manager.responseSerializer.acceptableContentTypes = acceptableContentTypes;
     
+    [manager GET:[self.class baseURL] parameters:nil success:^(AFHTTPRequestOperation *operation, id responseObject) {
+        NSLog(@"%@", responseObject);
+        NSDictionary *response = responseObject;
+        completionBlock(response);
+    } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+        NSLog(@"Failed to get object: %@", error);
+    }];
 }
 
 @end
+
+// TODO: Check that property type is not one of forbidden data types like NSData, NSInteger, CGFloat, etc
+// TODO: Regex in where expression, capture %@=%@ to underscore first expression to match column name.
+// TODO: Fetch SQL crashes if columnValue is nil.
+// TODO: Add support for NSMutableString.
