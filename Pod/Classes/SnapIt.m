@@ -595,18 +595,28 @@ static BOOL _isOpened;
     }
 }
 
+// Possible add @synchronized. May double read objects on another thread - performance optimization.
+
+// NOTE: Does not have many relation on has many object unless object has been saved. Should explicitly set that objects array if not saving.
 - (NSArray *)replaceGetter:(NSString *)propertyName {
-    NSString *ivarString = [NSString stringWithFormat:@"_%@", propertyName];
-    
-    Ivar objectIvar = class_getInstanceVariable(self.class, [ivarString UTF8String]);
-    NSArray *objects = object_getIvar(self, objectIvar);
-    if ([objects count] > 0) {
-        return objects;
-    } else {
-        if (_rowID) {
-            objects = [self.class findObjectsWithType:propertyName andID:[_rowID integerValue]];
-        }
-        return objects;
+    @synchronized(self.class) {
+        NSString *ivarString = [NSString stringWithFormat:@"_%@", propertyName];
+        
+        Ivar objectIvar = class_getInstanceVariable(self.class, [ivarString UTF8String]);
+        NSArray *objects = object_getIvar(self, objectIvar); // See if object has any of has many objects already
+        
+        NSString *foreignKey = [NSString stringWithFormat:@"%@_id", [NSStringFromClass(self.class) underscore]];
+        NSString *numberOfHasManyObjects = [self.class executeSQL:[NSString stringWithFormat:@"SELECT COUNT(*) FROM %@ WHERE %@=%@", [propertyName underscore], foreignKey, self.rowID]];
+        if ([objects count] > 0 && [numberOfHasManyObjects integerValue] == objects.count) {
+            return objects;
+        } else {
+            if (_rowID) {
+                objects = [self.class findObjectsWithType:propertyName andID:[_rowID integerValue]];
+                object_setIvar(self, objectIvar, objects);
+                // Cache objects to local object
+            }
+            return objects;
+        } 
     }
 }
 
