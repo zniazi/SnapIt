@@ -932,11 +932,19 @@ static BOOL _isOpened;
         NSArray *propertyNames = [self.class allPropertyNames];
         NSInteger propertyCount = [propertyNames count];
         for (NSInteger i = 0; i < propertyCount; i++) {
-            NSString *ivarString = [NSString stringWithFormat:@"_%@", propertyNames[i]];
-            Ivar objectIvar = class_getInstanceVariable(self.class, [ivarString UTF8String]);
-            id updatedPropertyValue = object_getIvar(object, objectIvar);
-            id ourPropertyValue = object_getIvar(self, objectIvar);
-            ourPropertyValue = updatedPropertyValue;
+            // If BOOL, update differently
+//            if (_propertiesListAndTypes == nil) {
+//                [self.class getAllPropertiesAndTypes];
+//            }
+//            if ([_propertiesListAndTypes[propertyNames[i]] isEqualToString:@"BOOL"]) {
+//                
+//            } else {
+                NSString *ivarString = [NSString stringWithFormat:@"_%@", propertyNames[i]];
+                Ivar objectIvar = class_getInstanceVariable(self.class, [ivarString UTF8String]);
+                id updatedPropertyValue = object_getIvar(object, objectIvar);
+                id ourPropertyValue = object_getIvar(self, objectIvar);
+                ourPropertyValue = updatedPropertyValue;
+//            }
         }
     }
 }
