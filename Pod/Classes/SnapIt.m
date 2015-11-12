@@ -267,10 +267,19 @@ static BOOL _isOpened;
         NSString *newColumn = [property underscore];
         NSPredicate *containsColumn = [NSPredicate predicateWithFormat:@"%@ IN SELF", newColumn];
         NSArray *filteredArray = [columnNames filteredArrayUsingPredicate:containsColumn];
+        // New Code
+        if (property == nil) {
+            continue;
+        }
+        //
         
         if (filteredArray.count == 0) {
             // TODO: Do not add column if it is an unsupported data type (NSData, NSInteger, etc)
-            NSString *propertyType = _propertiesListAndTypes[property];
+            NSString *propertyType = _propertiesListAndTypes[NSStringFromClass(self)][property];
+            if (propertyType == nil) {
+                NSLog(@"Null property type for %@", property);
+                continue; // New
+            }
             if (!([propertyType isEqualToString:@"NSArray"] || [propertyType isEqualToString:@"NSMutableArray"])) {
                 if (!([propertyType isEqualToString:@"TEXT"] || [propertyType isEqualToString:@"INTEGER"] || [propertyType isEqualToString:@"REAL"])) {
                     NSString *foreignKey = [NSString stringWithFormat:@"%@_id", [propertyType underscore]];
