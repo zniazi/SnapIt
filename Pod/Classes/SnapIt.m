@@ -848,14 +848,17 @@ static BOOL _isOpened;
             SEL g = NSSelectorFromString(getter);
             NSArray *objects = [self performSelector:g];
             
+            // Some objects point to this object, but they should no longer do so if this object does not reference them.
             NSArray *hasManyObjects = [self.class findObjectsWithType:key andID:[self.rowID integerValue]];
             NSString *className = NSStringFromClass(self.class);
             NSString *classSetter = [NSString stringWithFormat:@"set%@:", [className classify]];
             SEL s = NSSelectorFromString(classSetter);
+            NSLog(@"About to save");
             for (SnapIt *obj in hasManyObjects) {
                 [obj performSelector:s withObject:nil];
                 [obj save];
             }
+            
             for (SnapIt *object in objects) {
                 NSString *className = NSStringFromClass(self.class);
                 NSString *classSetter = [NSString stringWithFormat:@"set%@:", [className classify]];
@@ -863,6 +866,7 @@ static BOOL _isOpened;
                 [object performSelector:s withObject:self];
                 [object save];
             }
+            NSLog(@"Done saving");
         }
     }
 }
@@ -871,44 +875,51 @@ static BOOL _isOpened;
     sqlite3_stmt *statement;
     const char *dbpath = [self.class.databasePath UTF8String];
     
-    if (sqlite3_open(dbpath, self.class.catsDB) == SQLITE_OK) {
-        NSMutableString *deleteSQL = [NSMutableString stringWithFormat:@"DELETE FROM %@ ", [self.class getTableName]];
-        [deleteSQL appendString:[NSString stringWithFormat:@" WHERE id=%li", [self.rowID integerValue]]];
-        
-        const char *delete_statement = [deleteSQL UTF8String];
-        
-        sqlite3 *catsDB = *self.class.catsDB;
-        
-        sqlite3_prepare_v2(catsDB, delete_statement, -1, &statement, NULL);
-        if (sqlite3_step(statement) == SQLITE_DONE) {
-            NSLog(@"Object deleted");
-        } else {
-            NSLog(@"Failed to update object.");
-            NSLog(@"%s", sqlite3_errmsg(catsDB));
-        }
-        sqlite3_finalize(statement);
-        
-        sqlite3_close(catsDB);
-        catsDB = nil;
-    }
-    
-    // Let's do cleanup
-    NSDictionary *propertyDictionary = [self.class propertyDictionary];
-    for (NSString *key in propertyDictionary) {
-        NSString *propertyType = propertyDictionary[key];
-        if ([propertyDictionary[key] isEqualToString:@"NSArray"] || [propertyDictionary[key] isEqualToString:@"NSMutableArray"]) {
-            NSString *name = [key lowCamelCase];
-            NSString *getter = [NSString stringWithFormat:@"%@", name];
-            SEL g = NSSelectorFromString(getter);
-            NSArray *objects = [self performSelector:g];
+//    [self.class sleepIfDatabaseIsOpen];
+    @synchronized(self.class) {
+        if (sqlite3_open(dbpath, self.class.catsDB) == SQLITE_OK) {
+//            [self.class lockDatabase];
+            NSLog(@"deleteSelf open connection");
+            NSMutableString *deleteSQL = [NSMutableString stringWithFormat:@"DELETE FROM %@ ", [self.class getTableName]];
+            [deleteSQL appendString:[NSString stringWithFormat:@" WHERE id=%li", [self.rowID integerValue]]];
             
-            NSArray *hasManyObjects = [self.class findObjectsWithType:key andID:[self.rowID integerValue]];
-            NSString *className = NSStringFromClass(self.class);
-            NSString *classSetter = [NSString stringWithFormat:@"set%@:", [className classify]];
-            SEL s = NSSelectorFromString(classSetter);
-            for (SnapIt *obj in hasManyObjects) {
-                [obj performSelector:s withObject:nil];
-                [obj save];
+            const char *delete_statement = [deleteSQL UTF8String];
+            
+            sqlite3 *catsDB = *self.class.catsDB;
+            
+            sqlite3_prepare_v2(catsDB, delete_statement, -1, &statement, NULL);
+            if (sqlite3_step(statement) == SQLITE_DONE) {
+                NSLog(@"Object deleted");
+            } else {
+                NSLog(@"Failed to update object.");
+                NSLog(@"%s", sqlite3_errmsg(catsDB));
+            }
+            sqlite3_finalize(statement);
+            
+            sqlite3_close(catsDB);
+            NSLog(@"deleteSelf open connection");
+//            [self.class openDatabase];
+            catsDB = nil;
+        }
+        
+        // Let's do cleanup
+        NSDictionary *propertyDictionary = [self.class propertyDictionary];
+        for (NSString *key in propertyDictionary) {
+            NSString *propertyType = propertyDictionary[key];
+            if ([propertyDictionary[key] isEqualToString:@"NSArray"] || [propertyDictionary[key] isEqualToString:@"NSMutableArray"]) {
+                NSString *name = [key lowCamelCase];
+                NSString *getter = [NSString stringWithFormat:@"%@", name];
+                SEL g = NSSelectorFromString(getter);
+                NSArray *objects = [self performSelector:g];
+                
+                NSArray *hasManyObjects = [self.class findObjectsWithType:key andID:[self.rowID integerValue]];
+                NSString *className = NSStringFromClass(self.class);
+                NSString *classSetter = [NSString stringWithFormat:@"set%@:", [className classify]];
+                SEL s = NSSelectorFromString(classSetter);
+                for (SnapIt *obj in hasManyObjects) {
+                    [obj performSelector:s withObject:nil];
+                    [obj save];
+                }
             }
         }
     }
@@ -937,7 +948,7 @@ static BOOL _isOpened;
     [acceptableContentTypes addObject:@"text/plain"];
     manager.responseSerializer.acceptableContentTypes = acceptableContentTypes;
     NSDictionary *propertyDictionary = [self.class propertyDictionary];
-    
+
     NSMutableDictionary *params = [[NSMutableDictionary alloc] init];
     // TODO: If NSNumber and null, send as @"0"
     for (NSString *property in [self.class allPropertyNames]) {
@@ -954,6 +965,7 @@ static BOOL _isOpened;
     }
     NSLog(@"Backend Params: %@", params); // To be deleted
     if (self.backendId == nil) {
+        NSLog(@"Push to backend");
         [manager POST:[self.class baseURL] parameters:params success:^(AFHTTPRequestOperation *operation, id responseObject) {
             if (responseObject[@"id"] != nil) {
                 NSLog(@"Updated object on server.");
