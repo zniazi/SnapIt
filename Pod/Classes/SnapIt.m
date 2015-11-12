@@ -3,8 +3,10 @@
 //  SnapClass
 //
 //  Created by Zak Niazi on 10/28/14.
-//  Copyright (c) 2014 DanZak. All rights reserved.
+//  Copyright (c) 2014 Zak. All rights reserved.
 //
+
+// @synchronized blocks getter for has many association
 
 #import "SnapIt.h"
 #import <sqlite3.h>
@@ -12,20 +14,47 @@
 #import "NSString+Inflections.h"
 #import <AFNetworking/AFNetworking.h>
 
+// Don't fetch objects in has many association until they are called.
+// On reload of has many objects, only create new instances for objects that don't exist yet.
+
+// Create queue for this class. Put operation on queue. Take off queue when sqlite DB closes (FIFO)
+
+// Could have _dbConnection for each class. Calling save on a hasMany class would be fine because
+// the save method would be called inside another class which has another _dbConnection.
+
+// Delete method pass in argument (removeHasMany:true)
+
 static sqlite3 *_dbConnection;
 static NSString *_databasePath;
-static NSDictionary *_propertiesListAndTypes;
-static NSString *_lastSwizzledGetter;
+static NSMutableDictionary *_propertiesListAndTypes;
+static NSMutableDictionary *_columnNames;
+static NSMutableDictionary *_snapItCache; // Store cache of SnapIt objects -
+static BOOL _isOpened;
 
 @interface SnapIt()
 @property (nonatomic, readwrite) NSNumber *rowID;
 @end
+
+// Keywords "id" and "index" are reserved.
+
+// Changes I would like
+// 1. Add support for BOOL
+// 2. When property changes, change column type
+// 3. Modify pushBackend to accept data like images, audio, video
+
+
+// Implement queue for SnapIt
+// Put job to be done on queue - method name and value.
+// Job can be placed on queue when method like performFetch is called
+// When job completes or fails, an NSNotification is sent that pops the next item off of the queue and executes it.
 
 @implementation SnapIt
 
 // TODO: Incomplete (Method intended to convert JSON structure to object)
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary {
     self = [SnapIt init];
+    // for key in dictionary
+    // assign value of key to self
     
     return self;
 }
@@ -33,13 +62,28 @@ static NSString *_lastSwizzledGetter;
 - (instancetype)init
 {
     self = [super init];
-
+    if (self) {
+//        [self createHasManyAssociations];
+    }
     return self;
 }
 
 + (void)initialize {
+    if (!_propertiesListAndTypes) {
+        _propertiesListAndTypes = [[NSMutableDictionary alloc] init];
+    }
+    if (!_columnNames) {
+        _columnNames = [[NSMutableDictionary alloc] init];
+    }
+    if (!_snapItCache) {
+        _snapItCache = [[NSMutableDictionary alloc] init];
+    }
+    
     [self setupDB];
     [self createHasManyAssociations];
+    if (sqlite3_config(SQLITE_CONFIG_SERIALIZED) == SQLITE_ERROR) {
+        NSLog(@"Couldn't set serialized mode.");
+    }
 }
 
 + (NSString*)baseURL {
