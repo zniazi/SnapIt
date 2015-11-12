@@ -160,9 +160,9 @@ static BOOL _isOpened;
         NSString *propertyTypeAfterParse = [self parseString:cPropertyType];
         
         //only objective C objects are stored into dictionary
-        //        if ([self isObject:cPropertyType]) {
+//        if ([self isObject:cPropertyType]) {
         [temporaryDictionary setObject:propertyTypeAfterParse forKey:propertyName];
-        //        }
+//        }
     }
     
     // Duplicate Code
@@ -195,12 +195,12 @@ static BOOL _isOpened;
         }
     }
     
-    _propertiesListAndTypes = [NSDictionary dictionaryWithDictionary:correctDictionary];
+    _propertiesListAndTypes[NSStringFromClass(self)] = [NSDictionary dictionaryWithDictionary:correctDictionary];
 }
 
 + (NSDictionary *)propertyDictionary {
     [self getAllPropertiesAndTypes];
-    return _propertiesListAndTypes;
+    return _propertiesListAndTypes[NSStringFromClass(self)];
 }
 
 + (NSString *)parseString:(const char *)stringToParse
