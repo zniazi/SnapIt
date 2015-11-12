@@ -3,15 +3,18 @@
 //  SnapClass
 //
 //  Created by Zak Niazi on 10/28/14.
-//  Copyright (c) 2014 DanZak. All rights reserved.
+//  Copyright (c) 2014 Zak Niazi. All rights reserved.
 //
 
 #import <Foundation/Foundation.h>
+#import <sqlite3.h>
+#import <objc/runtime.h>
 
 @interface SnapIt : NSObject
 @property (strong, nonatomic) NSNumber *backendId;
+@property (nonatomic, readonly) NSNumber *rowID;
 
-- (void)save;
+- (BOOL)save;
 - (void)deleteSelf;
 - (void)fetch;
 
@@ -21,9 +24,10 @@
 + (id)find:(NSInteger *)objectID;
 + (void)deleteAll;
 + (NSString *)baseURL; // Possible to be deleted.
++ (id)lastObject;
++ (NSString *)executeSQL:(NSString *)sql;
 
 // Networking
 - (void)pushBackendWithCompletionBlock:(void (^)(BOOL success))completionBlock;
-- (void)pullBackend;
+- (void)pullBackendWithCompletionBlock:(void (^)(NSDictionary *response))completionBlock;
 @end
-
