@@ -230,21 +230,33 @@ static BOOL _isOpened;
 }
 
 + (NSArray *)columnNames {
-    NSMutableArray *columnNames = [NSMutableArray new];
-    const char *dbpath = [_databasePath UTF8String];
-    sqlite3_stmt *statement;
-    if (sqlite3_open(dbpath, &_dbConnection) == SQLITE_OK) {
-        NSString *sql = [NSString stringWithFormat:@"SELECT * FROM %@", [self getTableName]];
-        const char *query_statement = [sql UTF8String];
-        if (sqlite3_prepare_v2(_dbConnection, query_statement, -1, &statement, NULL) == SQLITE_OK) {
-            for (NSInteger i=0; i < sqlite3_column_count(statement); i++) {
-                NSString *columnName = [[NSString alloc] initWithUTF8String:sqlite3_column_name(statement, (int)i)];
-                [columnNames addObject:columnName];
-            }
-        }
-        sqlite3_close(_dbConnection);
+    if (_columnNames[NSStringFromClass(self)] != nil) {
+        return _columnNames[NSStringFromClass(self)];
     }
-    return columnNames;
+    
+//    [self.class sleepIfDatabaseIsOpen];
+    @synchronized(self) {
+        NSMutableArray *columnNames = [NSMutableArray new];
+        const char *dbpath = [_databasePath UTF8String];
+        sqlite3_stmt *statement;
+        if (sqlite3_open(dbpath, &_dbConnection) == SQLITE_OK) {
+//            [self lockDatabase];
+            NSLog(@"ColumnNames open connection");
+            NSString *sql = [NSString stringWithFormat:@"SELECT * FROM %@", [self getTableName]];
+            const char *query_statement = [sql UTF8String];
+            if (sqlite3_prepare_v2(_dbConnection, query_statement, -1, &statement, NULL) == SQLITE_OK) {
+                for (NSInteger i=0; i < sqlite3_column_count(statement); i++) {
+                    NSString *columnName = [[NSString alloc] initWithUTF8String:sqlite3_column_name(statement, (int)i)];
+                    [columnNames addObject:columnName];
+                }
+            }
+            sqlite3_close(_dbConnection);
+            NSLog(@"ColumnNames close connection");
+//            [self openDatabase];
+        }
+        _columnNames[NSStringFromClass(self)] = columnNames;
+        return _columnNames[NSStringFromClass(self)];
+    }
 }
 
 + (void)updateTable {
