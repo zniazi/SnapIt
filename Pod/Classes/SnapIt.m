@@ -297,6 +297,8 @@ static BOOL _isOpened;
     // SQLite does not support deleting columns
 }
 
+
+
 + (void)setupDB {
     if (self == [SnapIt class]) {
         NSArray *directoryPaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
@@ -310,37 +312,44 @@ static BOOL _isOpened;
         const char *dbpath = [_databasePath UTF8String];
         char *errMessage;
         
-        if (sqlite3_open(dbpath, &_dbConnection) == SQLITE_OK) {
-            NSMutableString *sql_create_string =
-            [NSMutableString stringWithFormat:@"CREATE TABLE IF NOT EXISTS %@(id INTEGER PRIMARY KEY AUTOINCREMENT", [self getTableName]];
-            NSArray *properties = [self allPropertyNames];
-            
-            for (NSInteger i=0; i < [properties count]; i++) {
-                NSString *propertyType = _propertiesListAndTypes[properties[i]];
-                // If property type is not NSArray, but is 'Cat' or 'Human', create a foreign key for belongs to.
-                // TODO: Create 4th nested if statement, checking if propertyType is a forbidden type like NSData, NSInteger, etc.
-                // TODO: If it is, create error message saying the data type is unsupported.
-                if (!([propertyType isEqualToString:@"NSArray"] || [propertyType isEqualToString:@"NSMutableArray"])) {
-                    if (!([propertyType isEqualToString:@"TEXT"] || [propertyType isEqualToString:@"INTEGER"] || [propertyType isEqualToString:@"REAL"])) {
-                        NSString *foreignKey = [NSString stringWithFormat:@"%@_id", [propertyType underscore]];
-                        [sql_create_string appendString:[NSString stringWithFormat:@", %@ %@", foreignKey, @"INTEGER"]];
-                    } else {
-                        [sql_create_string appendString:[NSString stringWithFormat:@", %@ %@", [properties[i] underscore], propertyType]];
+//        [self sleepIfDatabaseIsOpen];
+        @synchronized(self) {
+            if (sqlite3_open(dbpath, &_dbConnection) == SQLITE_OK) {
+//                [self lockDatabase];
+                NSLog(@"setupDB open connection");
+                NSMutableString *sql_create_string =
+                [NSMutableString stringWithFormat:@"CREATE TABLE IF NOT EXISTS %@(id INTEGER PRIMARY KEY AUTOINCREMENT", [self getTableName]];
+                NSArray *properties = [self allPropertyNames];
+                
+                for (NSInteger i=0; i < [properties count]; i++) {
+                    NSString *propertyType = _propertiesListAndTypes[NSStringFromClass(self)][properties[i]];
+                    // If property type is not NSArray, but is 'Cat' or 'Human', create a foreign key for belongs to.
+                    // TODO: Create 4th nested if statement, checking if propertyType is a forbidden type like NSData, NSInteger, etc.
+                    // TODO: If it is, create error message saying the data type is unsupported.
+                    if (!([propertyType isEqualToString:@"NSArray"] || [propertyType isEqualToString:@"NSMutableArray"])) {
+                        if (!([propertyType isEqualToString:@"TEXT"] || [propertyType isEqualToString:@"INTEGER"] || [propertyType isEqualToString:@"REAL"])) {
+                            NSString *foreignKey = [NSString stringWithFormat:@"%@_id", [propertyType underscore]];
+                            [sql_create_string appendString:[NSString stringWithFormat:@", %@ %@", foreignKey, @"INTEGER"]];
+                        } else {
+                            [sql_create_string appendString:[NSString stringWithFormat:@", %@ %@", [properties[i] underscore], propertyType]];
+                        }
                     }
                 }
+                
+                [sql_create_string appendString:@")"];
+                
+                const char *sql_create_statement = [sql_create_string UTF8String];
+                if (sqlite3_exec(_dbConnection, sql_create_statement, NULL, NULL, &errMessage) != SQLITE_OK)
+                {
+                    NSLog(@"Failed to create table.");
+                }
+                sqlite3_close(_dbConnection);
+                NSLog(@"setupDB close connection");
+//                [self openDatabase];
+                
+            } else {
+                NSLog(@"Failed to open / create Database.");
             }
-            
-            [sql_create_string appendString:@")"];
-            
-            const char *sql_create_statement = [sql_create_string UTF8String];
-            if (sqlite3_exec(_dbConnection, sql_create_statement, NULL, NULL, &errMessage) != SQLITE_OK)
-            {
-                NSLog(@"Failed to create table.");
-            }
-            sqlite3_close(_dbConnection);
-            
-        } else {
-            NSLog(@"Failed to open / create Database.");
         }
     }
 }
