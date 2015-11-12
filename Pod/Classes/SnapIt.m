@@ -359,93 +359,187 @@ static BOOL _isOpened;
     const char *dbpath = [_databasePath UTF8String];
     char *errMessage;
     
-    if (sqlite3_open(dbpath, &_dbConnection) == SQLITE_OK) {
-        const char *sql_statement = [sql UTF8String];
-        if (sqlite3_exec(_dbConnection, sql_statement, NULL, NULL, &errMessage) != SQLITE_OK)
-        {
-            NSLog(@"Error executing SQL.");
+    @synchronized(self) {
+        if (sqlite3_open(dbpath, &_dbConnection) == SQLITE_OK) {
+            NSLog(@"performSQL open connection");
+            const char *sql_statement = [sql UTF8String];
+            if (sqlite3_exec(_dbConnection, sql_statement, NULL, NULL, &errMessage) != SQLITE_OK)
+            {
+                NSLog(@"Error executing SQL.");
+            }
+            sqlite3_close(_dbConnection);
+            NSLog(@"performSQL close connection");
+        } else {
+            NSLog(@"Failed to open database connection.");
         }
-        sqlite3_close(_dbConnection);
+    }
+}
+
+// Try and cache value. Set hasMany object. If doesn't exist, then fetch. Or store locally to class in cache.
++ (NSArray *)createObjectsFromDictionaries:(NSArray *)objectDictionaries {
+    NSMutableArray *snapItObjects = [[NSMutableArray alloc] init];
+    for (NSDictionary *objectDictionary in objectDictionaries) {
+        SnapIt *object = [[self alloc] init];
+        NSDictionary *propertyDictionary = [object.class propertyDictionary];
+        NSArray *columnNames = [objectDictionary allKeys];
+        for (NSString __strong *columnName in columnNames) {
+            NSString *dataString = objectDictionary[columnName];
+            if ([columnName isEqualToString:@"id"]) {
+                columnName = [@"rowID" classify];
+            } else {
+                columnName = [columnName classify];
+            }
+            // if class name superclass is SnapIt
+            NSString *className = [[columnName substringToIndex:columnName.length - 2] classify];
+            id snapItObject = [[NSClassFromString(className) alloc] init];
+            // Have to make sure object is not nil before invoking method on it.
+            if ([[columnName substringFromIndex:columnName.length - 2] isEqualToString:@"Id"] && snapItObject != nil && [snapItObject isKindOfClass:[SnapIt class]]) {
+                // Use cache here
+                NSInteger rowID = [dataString integerValue];
+                NSString *objectToFind = [[columnName underscore] substringToIndex:columnName.length - 2];
+                Class class = NSClassFromString([objectToFind classify]);
+                id data;
+                NSString *className = NSStringFromClass(class);
+                if (_snapItCache[className] && _snapItCache[className][@(rowID)]) {
+                    data = _snapItCache[className][@(rowID)];
+                } else {
+                    data = [self findObject:objectToFind withID:rowID];
+                    if (!_snapItCache[className]) {
+                        _snapItCache[className] = [[NSMutableDictionary alloc] init];
+                    }
+                    _snapItCache[className][@(rowID)] = data;
+                } 
+                
+                columnName = [columnName substringToIndex:columnName.length - 2];
+                NSString *setter = [NSString stringWithFormat:@"set%@:", columnName];
+                SEL s = NSSelectorFromString(setter);
+                [object performSelector:s withObject:data];
+                
+            } else {
+                NSString *setter = [NSString stringWithFormat:@"set%@:", columnName];
+                SEL s = NSSelectorFromString(setter);
+                
+                NSString *propertyName = [columnName lowCamelCase];
+                
+                if (dataString != nil) {
+                    if ([propertyDictionary[propertyName] isEqualToString:@"TEXT"]) {
+                        NSString *data = dataString;
+                        [object performSelector:s withObject:data];
+                    } else if ([propertyDictionary[propertyName] isEqualToString:@"REAL"]) {
+                        NSNumber *data = @([dataString floatValue]);
+                        [object performSelector:s withObject:data];
+                    } else if ([propertyDictionary[propertyName] isEqualToString:@"INTEGER"]) {
+                        NSNumber *data = @([dataString integerValue]);
+                        [object performSelector:s withObject:data];
+                    } else {
+                        if ([setter isEqualToString:@"setRowID:"]) {
+                            NSNumber *data = @([dataString integerValue]);
+                            [object performSelector:s withObject:data];
+                        }
+                    }
+                }
+            }
+        }
+        [snapItObjects addObject:object];
+    }
+    return snapItObjects;
+}
+
++ (void)sleepIfDatabaseIsOpen {
+//    @synchronized(self) {
+        [NSThread sleepForTimeInterval:0.03f];
+        for (NSInteger i = 0; i < 2; i++) {
+            if (_isOpened == YES) {
+                NSLog(@"Is opened: %li", i);
+                [NSThread sleepForTimeInterval:1.0f];
+            } else {
+                break;
+            }
+        }
+//    }
+}
+
++ (void)lockDatabase {
+    @synchronized(self) {
+        _isOpened = YES;
+    }
+}
+
++ (void)openDatabase {
+    @synchronized(self) {
+        _isOpened = NO;
+    }
+}
+
++ (NSString *)executeSQL:(NSString *)sql {
+    const char *dbpath = [_databasePath UTF8String];
+    sqlite3_stmt *statement;
+    NSMutableString *result = [[NSMutableString alloc] init];
+    
+    //    Remove for time being - blocking main thread. Put back when needed.
+    @synchronized(self) {
+        if (sqlite3_open(dbpath, &_dbConnection) == SQLITE_OK) {
+            NSLog(@"executeSQL open connection");
+            NSString *querySQL = sql;
+            const char *query_statement = [querySQL UTF8String];
+            if (sqlite3_prepare_v2(_dbConnection, query_statement, -1, &statement, NULL) == SQLITE_OK) {
+                while (sqlite3_step(statement) == SQLITE_ROW) {
+                    for (NSInteger i=0; i < sqlite3_column_count(statement); i++) {
+                        NSString *columnName = [[NSString alloc] initWithUTF8String:sqlite3_column_name(statement, (int)i)];
+                        NSString *dataString = nil;
+                        if (sqlite3_column_text(statement, (int)i) != nil) {
+                            dataString = [[NSString alloc] initWithUTF8String:(const char *)sqlite3_column_text(statement, (int)i)];
+                            [result appendString:[NSString stringWithFormat:@"%@", dataString]];
+                        }
+                    }
+                }
+                sqlite3_finalize(statement);
+            }
+            
+            sqlite3_close(_dbConnection);
+            NSLog(@"executeSQL close connection");
+        }
         
-    } else {
-        NSLog(@"Failed to open database connection.");
+        return result;
     }
 }
 
 + (NSArray *)performFetchWithSQL:(NSString *)sql {
     NSMutableArray *objects = [[NSMutableArray alloc] init];
+    NSArray *snapItObjects = [[NSArray alloc] init];
     const char *dbpath = [_databasePath UTF8String];
     sqlite3_stmt *statement;
-    if (sqlite3_open(dbpath, &_dbConnection) == SQLITE_OK) {
-        NSString *querySQL = sql;
-        const char *query_statement = [querySQL UTF8String];
-        if (sqlite3_prepare_v2(_dbConnection, query_statement, -1, &statement, NULL) == SQLITE_OK) {
-            while (sqlite3_step(statement) == SQLITE_ROW) {
-                SnapIt *object = [[self alloc] init];
-                NSDictionary *propertyDictionary = [object.class propertyDictionary];
-                for (NSInteger i=0; i < sqlite3_column_count(statement); i++) {
-                    NSString *columnName = [[NSString alloc] initWithUTF8String:sqlite3_column_name(statement, (int)i)];
-                    if ([columnName isEqualToString:@"id"]) {
-                        columnName = [@"rowID" classify];
-                    } else {
-                        columnName = [columnName classify];
-                    }
-                    // if class name superclass is SnapIt
-                    NSString *className = [[columnName substringToIndex:columnName.length - 2] classify];
-                    id snapItObject = [[NSClassFromString(className) alloc] init];
-                    // Have to make sure object is not nil before invoking method on it.
-                    if ([[columnName substringFromIndex:columnName.length - 2] isEqualToString:@"Id"] && snapItObject != nil && [snapItObject isKindOfClass:[SnapIt class]]) {
-                        if (sqlite3_column_text(statement, (int)i)) {
-                            NSString *dataString = [[NSString alloc] initWithUTF8String:(const char *)sqlite3_column_text(statement, (int)i)];
-                            NSString *objectToFind = [[columnName underscore] substringToIndex:columnName.length - 2];
-                            id data = [self findObject:objectToFind withID:[dataString integerValue]];
-                            columnName = [columnName substringToIndex:columnName.length - 2];
-                            NSString *setter = [NSString stringWithFormat:@"set%@:", columnName];
-                            SEL s = NSSelectorFromString(setter);
-                            [object performSelector:s withObject:data];
-                        }
-                    } else {
+    
+//    Remove for time being - blocking main thread. Put back when needed.
+    @synchronized(self) {
+        if (sqlite3_open(dbpath, &_dbConnection) == SQLITE_OK) {
+            NSLog(@"performFetchWithSQL open connection");
+            NSString *querySQL = sql;
+            const char *query_statement = [querySQL UTF8String];
+            if (sqlite3_prepare_v2(_dbConnection, query_statement, -1, &statement, NULL) == SQLITE_OK) {
+                //            NSLog(@"Query Statement: %@", querySQL);
+                while (sqlite3_step(statement) == SQLITE_ROW) {
+                    NSMutableDictionary *objectDictionary = [[NSMutableDictionary alloc] init];
+                    for (NSInteger i=0; i < sqlite3_column_count(statement); i++) {
+                        NSString *columnName = [[NSString alloc] initWithUTF8String:sqlite3_column_name(statement, (int)i)];
                         NSString *dataString = nil;
                         if (sqlite3_column_text(statement, (int)i) != nil) {
                             dataString = [[NSString alloc] initWithUTF8String:(const char *)sqlite3_column_text(statement, (int)i)];
-                        }
-                        
-                        NSString *setter = [NSString stringWithFormat:@"set%@:", columnName];
-                        SEL s = NSSelectorFromString(setter);
-                        
-                        
-                        NSString *propertyName = [columnName lowCamelCase];
-                        
-                        if (dataString != nil) {
-                            if ([propertyDictionary[propertyName] isEqualToString:@"TEXT"]) {
-                                NSString *data = dataString;
-                                [object performSelector:s withObject:data];
-                            } else if ([propertyDictionary[propertyName] isEqualToString:@"REAL"]) {
-                                NSNumber *data = @([dataString floatValue]);
-                                [object performSelector:s withObject:data];
-                            } else if ([propertyDictionary[propertyName] isEqualToString:@"INTEGER"]) {
-                                NSNumber *data = @([dataString integerValue]);
-                                [object performSelector:s withObject:data];
-                            } else {
-                                if ([setter isEqualToString:@"setRowID:"]) {
-                                    NSNumber *data = @([dataString integerValue]);
-                                    [object performSelector:s withObject:data];
-                                }
-                            }
+                            objectDictionary[columnName] = dataString;
                         }
                     }
+                    [objects addObject:objectDictionary];
                 }
-                
-                [objects addObject:object];
+                sqlite3_finalize(statement);
             }
-            sqlite3_finalize(statement);
+            
+            sqlite3_close(_dbConnection);
+            NSLog(@"performFetchWithSQL close connection");
+            snapItObjects = [self createObjectsFromDictionaries:objects];
         }
-        
-        sqlite3_close(_dbConnection);
+    
+        return snapItObjects;
     }
-    
-    return objects;
-    
 }
 
 + (NSArray *)where:(NSString *)whereClause {
@@ -467,6 +561,7 @@ static BOOL _isOpened;
     return [self performFetchWithSQL:sql];
 }
 
+// Should be able to remove objectID and use self.rowID
 + (NSArray *)findObjectsWithType:(NSString *)type andID:(NSInteger)objectID {
     NSString *className = [[type substringToIndex:type.length - 1] classify];
     Class class = NSClassFromString(className);
